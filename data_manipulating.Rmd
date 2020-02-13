@@ -1,0 +1,461 @@
+---
+title: "Data Manipulation using dplyr"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, purl=FALSE, message = FALSE}
+library(lubridate)
+library(tidyverse)
+knitr::opts_chunk$set(results='hide', comment = "#>", purl = FALSE)
+```
+
+
+# Data Manipulation using **`dplyr`**{#dplyr}
+
+> Learning Objectives
+>
+> * Select columns in a data frame with the **`dplyr`** function `select`.
+> * Select rows in a data frame according to filtering conditions with the **`dplyr`** function `filter`.
+> * Direct the output of one **`dplyr`** function to the input of another function with the 'pipe' operator `%>%`.
+> * Add new columns to a data frame that are functions of existing columns with `mutate`.
+> * Understand the split-apply-combine concept for data analysis.
+> * Use `summarize`, `group_by`, and `tally` to split a data frame into groups of observations, apply a summary statistics for each group, and then combine the results.
+------------
+
+We will be working a small subset of the data from the [Stanford Open Policing Project](https://openpolicing.stanford.edu). It contains information about traffic stops for blacks and whites in the state of Mississippi during January 2013 to mid-July of 2016. 
+
+Let's begin with loading our sample data into a data frame.
+
+```{r}
+trafficstops <- read.csv("ms_trafficstop_data.csv")
+head(trafficstops)
+```
+
+Manipulation of dataframes is a common task when you start exploring your data. We might select certain observations (rows) or variables (columns), group the data by a certain variable(s), or calculate summary statistics. 
+
+
+
+```{r, results='show'}
+library(dplyr)
+levels(trafficstops$county_name)
+sum(is.na(trafficstops$subject_age)) # there are 387 values are missing in age column
+str(trafficstops)   
+
+```
+
+
+Change the column names
+```{r, results='show'}
+
+trafficstops <- trafficstops %>% rename(drivers_age = subject_age) 
+trafficstops <- trafficstops %>% rename(drivers_race = subject_race)
+trafficstops <- trafficstops %>% rename(drivers_sex = subject_sex)
+trafficstops <- trafficstops %>% rename(Police_department = department_name)
+trafficstops <- trafficstops %>% rename(Officer_id = department_id)
+
+head(trafficstops)
+```
+
+
+
+If we were interested in the mean age of the driver in different counties we can do this using the normal base R operations:
+```{r, results='show'}
+
+
+
+result <- trafficstops %>%
+          filter(trafficstops$county_name == "Grenada County")
+mean(result$drivers_age, na.rm = TRUE)
+
+# na. rm in r refers to the logical parameter that tells the function whether or not to remove NA values from the calculation. It literally means NA remove. ... rm is TRUE, the function skips over any NA values.
+
+```
+
+
+Bracket subsetting is handy, but it can be cumbersome and difficult to read, especially for complicated operations. Furthermore, there is a fair amount of repetition. Repeating yourself will cost you time, both now and later, and potentially introduce some nasty bugs.
+
+**`dplyr`** is a package for making tabular data manipulation easier. 
+
+> Brief recap: 
+> Packages in R are sets of additional functions that let you do more stuff. Functions like `str()` or `data.frame()`, come built into R; packages give you access to more of them. Before you use a package for the first time you need to install it on your machine, and then you should import it in every subsequent R session when you need it.
+If you haven't, please installe the **`tidyverse`** package. 
+
+```{r, eval=FALSE, purl = FALSE}
+install.packages("tidyverse")    
+```
+
+**`tidyverse`** is an "umbrella-package" that installs a series of packages useful for data analysis which work together well. Some of them are considered **core** packages (among them **`tidyr`**, **`dplyr`**, **`ggplot2`**), because you are likely to use them in almost every analysis. Other packages, like `lubridate` (to work wiht dates) or `haven` (for SPSS, Stata, and SAS data) that you are likely to use not for every analysis are also installed. 
+
+If you type the following command, it will load the **core** `tidyverse` packages. 
+
+```{r, message = FALSE, purl = FALSE}
+library("tidyverse")    ## load the core tidyverse packages, incl. dplyr
+```
+
+If you need to use functions from `tidyverse` packages other than the core packages, you will need to load them separately.
+
+## What is **`dplyr`**?
+
+**`dplyr`** is one part of a larger **`tidyverse`** that enables you to work
+with data in tidy data formats. "Tidy datasets are easy to manipulate, model and visualise, and have a specific structure: each variable is a column, each observation is a row, and each type of observational unit is a table." (From Wickham, H. (2014): Tidy Data https://www.jstatsoft.org/article/view/v059i10)
+
+
+The package **`dplyr`** provides convenient tools for the most common data manipulation
+tasks. It is built to work directly with data frames, with many common tasks
+optimized by being written in a compiled language (C++). An additional feature is the
+ability to work directly with data stored in an external database. The benefits of
+doing this are that the data can be managed natively in a relational database,
+queries can be conducted on that database, and only the results of the query are
+returned.
+
+This addresses a common problem with R in that all operations are conducted
+in-memory and thus the amount of data you can work with is limited by available
+memory. The database connections essentially remove that limitation in that you
+can have a database of many 100s GB, conduct queries on it directly, and pull
+back into R only what you need for analysis.
+
+To learn more about **`dplyr`** after the workshop, you may want to check out the [handy data transformation with **`dplyr`** cheatsheet](https://github.com/rstudio/cheatsheets/raw/master/data-transformation.pdf).
+
+
+## Subsetting columns and rows
+
+To select columns of a
+data frame with `dplyr`, use `select()`. The first argument to this function is the data
+frame (`trafficstops`), and the subsequent arguments are the columns to keep.
+
+```{r, eval=FALSE, purl = FALSE}
+select(trafficstops, Police_department, Officer_id, drivers_race)
+```
+
+```{r, results = 'show', purl = FALSE, echo=FALSE}
+select(trafficstops, Police_department, Officer_id, drivers_race) %>% head()
+```
+
+It is worth knowing that `dplyr` comes with a number of ["select helpers"](https://www.rdocumentation.org/packages/dplyr/versions/0.7.2/topics/select_helpers), which are functions that allow you to select columns based on their names. For example:
+
+iris <- tbl_df(iris) # so it prints a little nicer
+select(iris, starts_with("Petal"))
+select(iris, ends_with("Width"))
+select(iris, contains("etal"))
+select(iris, matches(".t."))
+select(iris, Petal.Length, Petal.Width)
+select(iris, everything())
+vars <- c("Petal.Length", "Petal.Width")
+select(iris, one_of(vars))
+
+```{r, eval=FALSE, purl = FALSE}
+select(trafficstops, starts_with("driver"))
+```
+
+```{r, results = 'show', purl = FALSE, echo=FALSE}
+select(trafficstops, starts_with("driver")) %>% head()
+```
+
+To choose rows based on specific criteria, use `filter()`:
+
+```{r, eval=FALSE, purl = FALSE}
+filter(trafficstops, county_name == "Yazoo County")
+```
+
+```{r, results='show', purl = FALSE, echo=FALSE}
+filter(trafficstops, county_name == "Yazoo County") %>% head()
+```
+
+Here are some other ways to select rows:
+
+- select certain rows by row number: `slice(trafficstops, 1:3) # rows 1-3`
+- select random rows: 
+    - `sample_n(trafficstops, 5) # number of rows to select`
+    - `sample_frac(trafficstops, .01) # fraction of rows to select`
+
+To sort rows by variables use the `arrange` function: `arrange(trafficstops, county_name, stop_date)`
+
+```{r, results='show', echo=FALSE}
+slice(trafficstops, 1:3)
+```
+
+
+```{r, results='show', echo=FALSE}
+trafficstops %>% 
+  arrange(county_name, stop_date) %>% 
+  head()
+```
+
+
+## Pipes
+
+What if you wanted to filter **and** select on the same data? For example, lets find drivers over 85 years and only keep the violation and gender columns. There are three ways to do this: use intermediate steps, nested functions, or pipes.
+
+* Intermediate steps:
+
+With intermediate steps, you essentially create a temporary data frame and use
+that as input to the next function. This can clutter up your workspace with lots
+of objects. 
+
+
+```{r, eval=FALSE}
+tmp_df <- filter(trafficstops, drivers_age > 85)
+select(tmp_df, violation, drivers_sex)
+```
+
+* Nested functions
+
+You can also nest functions (i.e. one function inside of another).
+This is handy, but can be difficult to read if too many functions are nested as things are evaluated from the inside out.
+
+```{r, eval=FALSE}
+select(filter(trafficstops, drivers_age > 85), violation, drivers_sex)
+```
+
+* Pipes!
+
+The last option, pipes, are a fairly recent addition to R. Pipes let you take
+the output of one function and send it directly to the next, which is useful
+when you need to do many things to the same dataset.  Pipes in R look like
+`%>%` and are made available via the `magrittr` package, installed automatically
+with **`dplyr`**. If you use RStudio, you can type the pipe with **' Ctrl + Shift + M '**  if you have a PC.
+
+```{r, eval=FALSE, purl = FALSE}
+trafficstops %>%
+  filter(drivers_age > 85) %>%
+  select(violation, drivers_sex)
+```
+
+
+In the above, we use the pipe to send the `trafficstops` dataset first through
+`filter()` to keep rows where `drivers_sex` is Black, then through `select()`
+to keep only the `Officer_id` and `date` columns. Since `%>%` takes
+the object on its left and passes it as the first argument to the function on
+its right, we don't need to explicitly include it as an argument to the
+`filter()` and `select()` functions anymore.
+
+#contains() function choses the variables including the written text
+```{r}
+select(trafficstops, contains("driver"))
+```
+
+
+If we wanted to create a new object with this smaller version of the data, we
+could do so by assigning it a new name:
+
+```{r, results='show', purl = FALSE}
+senior_drivers <- trafficstops %>%
+  filter(drivers_age > 85) %>%
+  select(violation, drivers_sex, drivers_race)
+senior_drivers
+```
+
+Note that the final data frame is the leftmost part of this expression.
+
+> <h3>Challenge</h3>
+>
+>  Using pipes, subset the `trafficstops` data to include stops in Tunica County only and retain the columns `stop_date`, `driver_age`, and `violation_raw`. Bonus: sort the table by driver age.
+
+
+```{r, eval=FALSE, purl=FALSE}
+## Answer
+trafficstops %>% 
+  filter(county_name == "Tunica County") %>% 
+  select(date, drivers_age, violation) %>% 
+  arrange(desc(drivers_age))
+```
+
+
+## Add new columns
+
+Frequently you'll want to create new columns based on the values in existing columns. For this we'll use `mutate()`.
+
+To create a new column with the year the driver was born we can extract the first 4 elements of the string that represents the `driver_birthdate` and add it to the data frame like this:
+
+
+```{r, eval=F, purl = FALSE}
+trafficstops %>% 
+  mutate(birth_year = substring(1984, 1, 4)) -> trafficstops
+```
+
+The new and edited columns will not permanently be added to the existing data frame -- unless we explicitly save the output.
+
+> <h3>Challenge</h3>
+>
+>  Create a new data frame from the `trafficstops` data that meets the following
+>  criteria: contains only the `violation` column for female drivers of age 50 that were stopped on a Sunday. For this add a new column to your data frame called
+>  `weekday_of_stop` containing the number of the weekday when the stop occurred. Use the `wday()` function from `lubridate` (Sunday = 1).
+> 
+> Think about how the commands should be ordered to produce this data frame!
+```{r, eval=FALSE, purl=TRUE, echo=FALSE}
+## Mutate Challenge:
+## Create a new data frame from the `trafficstops` data that meets the following
+## criteria: contains only the `violation_raw` column for female drivers of age 50 that were stopped on a Sunday. For this add a new column to your data frame called
+## `weekday_of_stop` containing the number of the weekday when the stop occurred. Use the `wday()` function from `lubridate` (Sunday = 1).
+## Think about how the commands should be ordered to produce this data frame!
+```
+
+
+```{r, eval=FALSE, purl=FALSE}
+## Answer
+trafficstops %>% 
+  filter(drivers_age == 50 & drivers_sex == "female") %>% 
+  mutate(wds = wday(ymd(date))) %>% 
+  select(violation, wds) %>% 
+  filter(wds == 1)
+```
+--->
+
+## What is split-apply-combine?
+
+Many data analysis tasks can be approached using the *split-apply-combine*
+paradigm: split the data into groups, apply some analysis to each group, and
+then combine the results. 
+
+```{r split-apply-combine, echo=FALSE, results='asis', out.width='\\textwidth', fig.cap='Split - Apply - Combine'}
+knitr::include_graphics('img/split-apply-combine.png')
+```
+
+
+**`dplyr`** makes this very easy through the use of the
+`group_by()` function.
+
+`group_by()` is often used together with `summarize()`, which collapses each
+group into a single-row summary of that group. `group_by()` takes as arguments
+the column names that contain the **categorical** variables for which you want
+to calculate the summary statistics. So to view the mean age for black and white drivers:
+
+```{r, results='show', purl = FALSE}
+trafficstops %>%
+  group_by(drivers_race) %>%
+  summarize(mean_age = mean(drivers_age, na.rm=TRUE))
+```
+
+
+So, back to the beginning of the chapter, where we tried to calculate the mean age of the driver for different counties, how would we do this? Like this:
+
+```{r, results='show', purl = FALSE, eval=FALSE}
+trafficstops %>%
+  group_by(county_name) %>%
+  summarize(mean_age = mean(drivers_age, na.rm=TRUE))
+```
+
+You can also group by multiple columns:
+
+```{r, results='show', purl = FALSE}
+trafficstops %>% 
+  group_by(county_name, drivers_race) %>%
+  summarize(mean_age = mean(drivers_age, na.rm=TRUE))
+```
+
+
+If we wanted to remove the line with `NA` we could insert a `filter()` in the chain:
+
+```{r, results='show', purl = FALSE}
+trafficstops %>%
+  filter(!is.na(drivers_race)) %>% 
+  group_by(county_name, drivers_race) %>%
+  summarize(mean_age = mean(drivers_age, na.rm=TRUE))
+```
+
+Recall that `is.na()` is a function that determines whether something is an `NA`. The `!` symbol negates the result, so we’re asking for everything that is _not_ an `NA`.
+
+You may have noticed that the output from these calls looks a little different. That's because **`dplyr`** has changed our `data.frame` object
+to an object of class `tbl_df`, also known as a "tibble". Tibble's data
+structure is very similar to a data frame. For our purposes the only differences
+are that (1) columns of class `character` are never converted into
+factors, and (2) in addition to displaying the data type of each column under its name, it only prints the first few rows of data and only as many columns as fit on one screen. If we wanted to print all columns we can use the print command, and set the `width` parameter to `Inf`. To print the first 6 rows for example we would do this: `print(my_tibble, n=6, width=Inf)`.
+
+
+Once the data are grouped, you can also summarize multiple variables at the same
+time (and not necessarily on the same variable). For instance, we could add a
+column indicating the minimum age in each group (i.e. county):
+
+```{r, results='show', purl = FALSE}
+trafficstops %>%
+  filter(!is.na(drivers_race)) %>% 
+  group_by(county_name, drivers_race) %>%
+  summarize(mean_age = mean(drivers_age, na.rm=TRUE),
+            min_age = min(drivers_age, na.rm=TRUE))
+```
+
+
+## Tallying
+
+When working with data, it is also common to want to know the number of
+observations found for each factor or combination of factors. For this, **`dplyr`**
+provides `tally()`. For example, if we wanted to see how many traffic stops each officer recorded we would do:
+
+```{r, eval=F, purl = FALSE}
+trafficstops %>%
+  group_by(Officer_id) %>%
+  tally()
+```
+
+We can optionally sort the results in descending order by adding `sort=TRUE`:
+
+```{r, eval=F, purl = FALSE}
+trafficstops %>%
+  group_by(Officer_id) %>%
+  tally(sort=TRUE)
+```
+
+Here, `tally()` is the action applied to the groups created by `group_by()` and counts the total number of records for each category.
+
+Alternatives:
+```{r}
+trafficstops %>%
+  group_by(Officer_id) %>%
+  summarize(n = n()) # n() is useful when count is needed for a calculation
+
+trafficstops %>%
+  count(Officer_id) # count() calls group_by automatically, then tallies
+```
+
+
+> Challenge
+> 
+> Which 3 counties were the ones with the most stops in 2013?
+> Hint: use the year() function from lubridate.
+
+```{r, eval=F, echo=FALSE, purl=FALSE}
+## Answer 1
+library(lubridate)
+trafficstops %>% 
+   mutate (stopyear = year(ymd(date))) %>% # choose only th year from the date variable
+   filter(stopyear == 2013) %>% 
+   count(county_name, sort=TRUE) %>% 
+   head(3)
+```
+
+
+## Joining two tables
+
+<<<<<<< HEAD
+It is not uncommon that we have our data spread out in different tables and need to bring those together for analysis. In this example we will combine the numbers of trafficstops for black and white drivers per county together with the numbers of the black and white total population for these counties. The population data are the estimated values of the 5 year average from the 2011-2015 American Community Survey (ACS):
+
+
+```{r, results='show'}
+population <- read.csv("MS_acs2015_bw.csv")
+head(population)
+```
+
+In a first step we will use a previous `dplyr` command to count all the trafficstops per county.
+
+```{r, results='show'}
+trafficstops %>% 
+  group_by(county_name) %>% 
+  summarise(n_stops = n())
+```
+
+We will then pipe this into our next operation where we bring the two tables together. We will use `left_join`, which returns all rows from the left table, and all columns from the left and the right table. As unique ID, which uniquely identifies the corresponding records in each table we use the County Names. 
+
+```{r, results='show'}
+trafficstops %>% 
+  group_by(county_name) %>% 
+  summarise(n_stops = n()) %>% 
+  left_join(MS_bw_pop, by = c("county_name" = "County")) %>% 
+  head()
+```
+
+
+
